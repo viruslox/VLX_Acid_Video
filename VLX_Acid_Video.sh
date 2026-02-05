@@ -14,9 +14,17 @@ SAVE=false
 STREAM=false
 SAVE_NAME=""
 STREAM_URL=""
+LUMA=false
+HUE=false
+TINT=false
+VIGNETTE=false
+ZOOM=false
+LAGFUN=false
+PIXELATE=false
+EDGE=false
 
 usage() {
-    echo "Usage: $0 -t <type> -s <WxH> -f <fps> [-d <sec>] [-stream <url> | -save [filename]]"
+    echo "Usage: $0 -t <type> -s <WxH> -f <fps> [-d <sec>] [modifiers] [-stream <url> | -save [filename]]"
     echo ""
     echo "Options:"
     echo "  -t <type>       Generator type: urandom, seq, fibonacci, fourier, fractal,"
@@ -27,6 +35,16 @@ usage() {
     echo "  -stream <url>   Stream to URL (e.g., rtsp://localhost:8554/mystream)"
     echo "  -save [file]    Save to file (default: AcidVideo_<type>_....webm)"
     echo "  --update        Update the script from GitHub (must be used alone)"
+    echo ""
+    echo "Modifiers (combineable):"
+    echo "  -luma           Enable Luma Keying (transparency based on brightness)"
+    echo "  -hue            Enable Dynamic Hue Shift"
+    echo "  -tint           Enable Color Tint"
+    echo "  -vignette       Enable Vignette"
+    echo "  -zoom           Enable Dynamic Zoom"
+    echo "  -lagfun         Enable Lagfun (trails/decay)"
+    echo "  -pixelate       Enable Pixelation (Mosaic)"
+    echo "  -edge           Enable Edge Detection"
     echo ""
     echo "Note: -stream and -save are mutually exclusive."
     exit 1
@@ -39,6 +57,14 @@ while [[ "$#" -gt 0 ]]; do
         -s) SIZE="$2"; shift ;;
         -f) FPS="$2"; shift ;;
         -d) DUR="$2"; shift ;;
+        -luma) LUMA=true ;;
+        -hue) HUE=true ;;
+        -tint) TINT=true ;;
+        -vignette) VIGNETTE=true ;;
+        -zoom) ZOOM=true ;;
+        -lagfun) LAGFUN=true ;;
+        -pixelate) PIXELATE=true ;;
+        -edge) EDGE=true ;;
         -stream)
             STREAM=true
             if [[ "$#" -gt 1 && "$2" != -* ]]; then
@@ -94,7 +120,7 @@ fi
 case $TYPE in
     urandom)
         # Raw entropy stream
-        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=rgb24,noise=all_strength=100:allf=t+u"
+        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=rgba,noise=all_strength=100:allf=t+u"
         ;;
     fourier)
         # Tri-channel interference patterns
@@ -112,7 +138,7 @@ case $TYPE in
         ;;
     perlin)
         # Organic Clouds/Smoke
-        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=yuv420p -vf noise=alls=100:allf=t+u,scale=w=iw/10:h=ih/10:flags=neighbor,scale=w=$W:h=$H:flags=bicubic,gblur=sigma=10"
+        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=yuva420p -vf noise=alls=100:allf=t+u,scale=w=iw/10:h=ih/10:flags=neighbor,scale=w=$W:h=$H:flags=bicubic,gblur=sigma=10"
         ;;
     reaction)
         # Reaction-Diffusion (Stripes/Mazes)
@@ -132,6 +158,30 @@ case $TYPE in
         ;;
     *) echo "Unknown generator type."; usage ;;
 esac
+
+# Construct Modifier Chain
+MOD_CHAIN=""
+if [ "$ZOOM" = true ]; then MOD_CHAIN+="zoompan=z='min(zoom+0.0015,1.5)':d=1:s=${W}x${H},"; fi
+if [ "$HUE" = true ]; then MOD_CHAIN+="hue=h=t*10,"; fi
+if [ "$TINT" = true ]; then MOD_CHAIN+="colorbalance=rs=.1:gs=-.1:bs=.1,"; fi
+if [ "$EDGE" = true ]; then MOD_CHAIN+="edgedetect=low=0.1:high=0.4,"; fi
+if [ "$PIXELATE" = true ]; then MOD_CHAIN+="scale=w=iw/10:h=ih/10:flags=neighbor,scale=w=$W:h=$H:flags=neighbor,"; fi
+if [ "$LUMA" = true ]; then MOD_CHAIN+="lumakey=threshold=0.05:tolerance=0.1:softness=0.2,"; fi
+if [ "$LAGFUN" = true ]; then MOD_CHAIN+="lagfun=decay=0.95,"; fi
+if [ "$VIGNETTE" = true ]; then MOD_CHAIN+="vignette,"; fi
+
+# Remove trailing comma
+MOD_CHAIN=${MOD_CHAIN%,}
+
+# Apply Modifiers
+if [ -n "$MOD_CHAIN" ]; then
+    if [[ "$INPUT" == *"-vf "* ]]; then
+        INPUT="${INPUT},$MOD_CHAIN"
+    else
+        INPUT="$INPUT -vf $MOD_CHAIN"
+    fi
+    echo "Applied modifiers: $MOD_CHAIN"
+fi
 
 echo "Executing $TYPE engine..."
 
@@ -156,6 +206,6 @@ if [ "$STREAM" = true ]; then
     ffmpeg -y $INPUT $DUR_ARG -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p $FMT "$OUTPUT"
 else
     # Save to file (keep original settings)
-    ffmpeg -y $INPUT $DUR_ARG -c:v libvpx -cpu-used 4 -deadline realtime -pix_fmt yuv420p "$OUTPUT"
+    ffmpeg -y $INPUT $DUR_ARG -c:v libvpx -cpu-used 4 -deadline realtime -pix_fmt yuva420p "$OUTPUT"
     echo "Video saved to $OUTPUT"
 fi
