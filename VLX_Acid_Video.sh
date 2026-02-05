@@ -1,15 +1,16 @@
 #!/bin/bash
 
 # Acid_video - Procedural Video Generator
-# Usage: ./generate.sh -t <type> -s <widthxheight> -f <fps> -d <duration> [-stream] [-save [filename]]
+# Usage: ./generate.sh -t <type> -s <widthxheight> -f <fps> -d <duration> [-stream <url> | -save [filename]]
 
 OUTPUT=""
 SAVE=false
 STREAM=false
 SAVE_NAME=""
+STREAM_URL=""
 
 usage() {
-    echo "Usage: $0 -t [urandom|seq|fibonacci|fourier|fractal] -s [WxH] -f [1-60] -d [sec] [-stream] [-save [filename]]"
+    echo "Usage: $0 -t [urandom|seq|fibonacci|fourier|fractal] -s [WxH] -f [1-60] -d [sec] [-stream <url> | -save [filename]]"
     exit 1
 }
 
@@ -20,7 +21,16 @@ while [[ "$#" -gt 0 ]]; do
         -s) SIZE="$2"; shift ;;
         -f) FPS="$2"; shift ;;
         -d) DUR="$2"; shift ;;
-        -stream) STREAM=true ;;
+        -stream)
+            STREAM=true
+            if [[ "$#" -gt 1 && "$2" != -* ]]; then
+                STREAM_URL="$2"
+                shift
+            else
+                echo "Error: -stream requires a URL argument."
+                exit 1
+            fi
+            ;;
         -save)
             SAVE=true
             # Check if next argument exists and is not a flag
@@ -37,6 +47,10 @@ done
 # Validation logic
 if [[ -z "$TYPE" || -z "$SIZE" || -z "$FPS" || -z "$DUR" ]]; then usage; fi
 if [[ "$STREAM" == false && "$SAVE" == false ]]; then usage; fi
+if [[ "$STREAM" == true && "$SAVE" == true ]]; then
+    echo "Error: -stream and -save cannot be used together."
+    usage
+fi
 
 if [[ ! "$SIZE" =~ ^[0-9]+x[0-9]+$ ]] || [ "$FPS" -lt 1 ] || [ "$FPS" -gt 60 ]; then
     echo "Error: Invalid dimensions or FPS out of range (1-60)."
@@ -51,35 +65,11 @@ if [ "$SAVE" = true ]; then
     if [ -z "$SAVE_NAME" ]; then
         SAVE_NAME="AcidVideo_${TYPE}_$(date +%Y-%m-%d_%H-%M-%S).webm"
     fi
-fi
-
-if [ "$STREAM" = true ]; then
-    OUTPUT="stream.webm"
-else
     OUTPUT="$SAVE_NAME"
 fi
 
-# Generate HTML5 Interface (Only if streaming)
 if [ "$STREAM" = true ]; then
-cat <<EOF > index.html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Acid_video Live</title>
-    <style>
-        body { background: #050505; color: #00ff00; font-family: monospace; text-align: center; margin-top: 50px; }
-        video { border: 2px solid #333; box-shadow: 0 0 20px #00ff0033; max-width: 90vw; }
-        .meta { margin-top: 20px; color: #888; }
-    </style>
-</head>
-<body>
-    <h2>ACID_VIDEO :: GENERATING [${TYPE^^}]</h2>
-    <video controls autoplay muted><source src="$OUTPUT" type="video/webm"></video>
-    <div class="meta">Config: $SIZE @ $FPS FPS | Duration: $DUR s</div>
-</body>
-</html>
-EOF
+    OUTPUT="$STREAM_URL"
 fi
 
 # Generator definitions
@@ -106,16 +96,19 @@ case $TYPE in
 esac
 
 echo "Executing $TYPE engine..."
-ffmpeg -y $INPUT -t "$DUR" -c:v libvpx -cpu-used 4 -deadline realtime -pix_fmt yuv420p "$OUTPUT"
 
-# Cleanup / Save logic
 if [ "$STREAM" = true ]; then
-    if [ "$SAVE" = true ]; then
-        cp "$OUTPUT" "$SAVE_NAME"
-        echo "Video saved to $SAVE_NAME"
+    # Detect format based on protocol
+    FMT=""
+    if [[ "$OUTPUT" == srt://* ]]; then
+        FMT="-f mpegts"
+    elif [[ "$OUTPUT" == rtsp://* ]]; then
+        FMT="-f rtsp"
     fi
-    rm -f "$OUTPUT"
-    echo "Stream cleanup complete."
-elif [ "$SAVE" = true ]; then
+    # Stream with low latency settings
+    ffmpeg -y $INPUT -t "$DUR" -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p $FMT "$OUTPUT"
+else
+    # Save to file (keep original settings)
+    ffmpeg -y $INPUT -t "$DUR" -c:v libvpx -cpu-used 4 -deadline realtime -pix_fmt yuv420p "$OUTPUT"
     echo "Video saved to $OUTPUT"
 fi
