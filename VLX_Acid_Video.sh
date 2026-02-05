@@ -104,6 +104,8 @@ if [ "$STREAM" = true ]; then
         FMT="-f mpegts"
     elif [[ "$OUTPUT" == rtsp://* ]]; then
         FMT="-f rtsp"
+    elif [[ "$OUTPUT" == rtsps://* ]]; then
+        FMT="-f rtsp"
     fi
     # Stream with low latency settings
     ffmpeg -y $INPUT -t "$DUR" -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p $FMT "$OUTPUT"
