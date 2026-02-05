@@ -59,7 +59,7 @@ EOF
 case $TYPE in
     urandom)
         # Raw entropy stream
-        INPUT="-f rawvideo -pix_fmt rgb24 -s $SIZE -r $FPS -i <(dd if=/dev/urandom bs=$((W*H*3)) count=$((FPS*DUR)) 2>/dev/null)"
+        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=rgb24,noise=alls=100:allf=t+u"
         ;;
     fourier)
         # Tri-channel interference patterns
