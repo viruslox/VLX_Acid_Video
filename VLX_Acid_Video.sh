@@ -10,7 +10,17 @@ SAVE_NAME=""
 STREAM_URL=""
 
 usage() {
-    echo "Usage: $0 -t [urandom|seq|fibonacci|fourier|fractal] -s [WxH] -f [1-60] -d [sec] [-stream <url> | -save [filename]]"
+    echo "Usage: $0 -t <type> -s <WxH> -f <fps> [-d <sec>] [-stream <url> | -save [filename]]"
+    echo ""
+    echo "Options:"
+    echo "  -t <type>       Generator type: urandom, seq, fibonacci, fourier, fractal"
+    echo "  -s <WxH>        Resolution (e.g., 1280x720)"
+    echo "  -f <fps>        Frame rate (1-60)"
+    echo "  -d <sec>        Duration in seconds (optional). If omitted, runs until Ctrl-C."
+    echo "  -stream <url>   Stream to URL (e.g., rtsp://localhost:8554/mystream)"
+    echo "  -save [file]    Save to file (default: AcidVideo_<type>_....webm)"
+    echo ""
+    echo "Note: -stream and -save are mutually exclusive."
     exit 1
 }
 
@@ -45,7 +55,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # Validation logic
-if [[ -z "$TYPE" || -z "$SIZE" || -z "$FPS" || -z "$DUR" ]]; then usage; fi
+if [[ -z "$TYPE" || -z "$SIZE" || -z "$FPS" ]]; then usage; fi
 if [[ "$STREAM" == false && "$SAVE" == false ]]; then usage; fi
 if [[ "$STREAM" == true && "$SAVE" == true ]]; then
     echo "Error: -stream and -save cannot be used together."
@@ -97,6 +107,13 @@ esac
 
 echo "Executing $TYPE engine..."
 
+DUR_ARG=""
+if [[ -n "$DUR" ]]; then
+    DUR_ARG="-t $DUR"
+else
+    echo "Running indefinitely. Press Ctrl-C to stop."
+fi
+
 if [ "$STREAM" = true ]; then
     # Detect format based on protocol
     FMT=""
@@ -108,9 +125,9 @@ if [ "$STREAM" = true ]; then
         FMT="-f rtsp"
     fi
     # Stream with low latency settings
-    ffmpeg -y $INPUT -t "$DUR" -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p $FMT "$OUTPUT"
+    ffmpeg -y $INPUT $DUR_ARG -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p $FMT "$OUTPUT"
 else
     # Save to file (keep original settings)
-    ffmpeg -y $INPUT -t "$DUR" -c:v libvpx -cpu-used 4 -deadline realtime -pix_fmt yuv420p "$OUTPUT"
+    ffmpeg -y $INPUT $DUR_ARG -c:v libvpx -cpu-used 4 -deadline realtime -pix_fmt yuv420p "$OUTPUT"
     echo "Video saved to $OUTPUT"
 fi
