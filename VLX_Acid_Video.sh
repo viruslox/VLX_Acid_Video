@@ -3,6 +3,12 @@
 # Acid_video - Procedural Video Generator
 # Usage: ./generate.sh -t <type> -s <widthxheight> -f <fps> -d <duration> [-stream <url> | -save [filename]]
 
+if [[ "$1" == "--update" && "$#" -eq 1 ]]; then
+    echo "Self-updating from GitHub..."
+    git pull
+    exit $?
+fi
+
 OUTPUT=""
 SAVE=false
 STREAM=false
@@ -19,6 +25,7 @@ usage() {
     echo "  -d <sec>        Duration in seconds (optional). If omitted, runs until Ctrl-C."
     echo "  -stream <url>   Stream to URL (e.g., rtsp://localhost:8554/mystream)"
     echo "  -save [file]    Save to file (default: AcidVideo_<type>_....webm)"
+    echo "  --update        Update the script from GitHub (must be used alone)"
     echo ""
     echo "Note: -stream and -save are mutually exclusive."
     exit 1
