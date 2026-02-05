@@ -63,7 +63,7 @@ case $TYPE in
         ;;
     fourier)
         # Tri-channel interference patterns
-        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS -vf \"geq=r='128+127*sin(sqrt(pow(X-W/2,2)+pow(Y-H/2,2))/20-T)':g='128+127*sin(X/30+T)':b='128+127*cos(Y/30+T)'\""
+        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=gray8 -f lavfi -i nullsrc=s=${W}x1:r=$FPS,format=gray8 -f lavfi -i nullsrc=s=1x${H}:r=$FPS,format=gray8 -filter_complex [1:v]geq=lum='128+127*sin(X/30+T)',scale=${W}x${H}:flags=neighbor,setsar=1[g];[2:v]geq=lum='128+127*cos(Y/30+T)',scale=${W}x${H}:flags=neighbor,setsar=1[b];[0:v]geq=lum='128+127*sin(hypot(X-W/2,Y-H/2)/20-T)'[r];[g][b][r]mergeplanes=map0s=0:map0p=0:map1s=1:map1p=0:map2s=2:map2p=0:format=gbrp[out] -map [out]"
         ;;
     fibonacci)
         # Golden ratio spiral-based math
