@@ -19,7 +19,8 @@ usage() {
     echo "Usage: $0 -t <type> -s <WxH> -f <fps> [-d <sec>] [-stream <url> | -save [filename]]"
     echo ""
     echo "Options:"
-    echo "  -t <type>       Generator type: urandom, seq, fibonacci, fourier, fractal"
+    echo "  -t <type>       Generator type: urandom, seq, fibonacci, fourier, fractal,"
+    echo "                  perlin, reaction, voronoi, chaos, life"
     echo "  -s <WxH>        Resolution (e.g., 1280x720)"
     echo "  -f <fps>        Frame rate (1-60)"
     echo "  -d <sec>        Duration in seconds (optional). If omitted, runs until Ctrl-C."
@@ -108,6 +109,26 @@ case $TYPE in
         ;;
     seq)
         INPUT="-f lavfi -i testsrc=size=$SIZE:rate=$FPS"
+        ;;
+    perlin)
+        # Organic Clouds/Smoke
+        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=yuv420p -vf noise=alls=100:allf=t+u,scale=w=iw/10:h=ih/10:flags=neighbor,scale=w=$W:h=$H:flags=bicubic,gblur=sigma=10"
+        ;;
+    reaction)
+        # Reaction-Diffusion (Stripes/Mazes)
+        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=gray8 -filter_complex noise=alls=100:allf=t+u[n];[n]split[a][b];[a]gblur=sigma=2[a1];[b]gblur=sigma=5[b1];[a1][b1]blend=all_mode=difference,geq=lum='gt(p(X,Y),10)*255'"
+        ;;
+    voronoi)
+        # Voronoi Cellular/Mosaic
+        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=gray8 -vf geq=lum='min(hypot(X-W*0.2-W*0.1*sin(T),Y-H*0.2-H*0.1*cos(T)),min(hypot(X-W*0.8+W*0.1*sin(T*1.1),Y-H*0.8+H*0.1*cos(T*1.1)),hypot(X-W*0.5,Y-H*0.5+H*0.3*sin(T*0.7))))',geq=lum='255-lum(X,Y)/W*255*4'"
+        ;;
+    chaos)
+        # Lorenz/Chaos Orbits
+        INPUT="-f lavfi -i aevalsrc=exprs='sin(10*t+sin(t))|cos(11*t+cos(t))':s=44100 -filter_complex [0:a]avectorscope=s=$SIZE:r=$FPS:zoom=2:rc=0:gc=255:bc=0:rf=0:gf=0:bf=0[out] -map [out]"
+        ;;
+    life)
+        # Game of Life
+        INPUT="-f lavfi -i life=s=$SIZE:r=$FPS:mold=10:life_color=0x00FF00:death_color=0x000000"
         ;;
     *) echo "Unknown generator type."; usage ;;
 esac
