@@ -12,7 +12,7 @@ class AcidHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 if __name__ == "__main__":
-    with socketserver.TCPServer(("", PORT), AcidHandler) as httpd:
+    with socketserver.ThreadingTCPServer(("", PORT), AcidHandler) as httpd:
         print(f"Acid_video Server: http://localhost:{PORT}")
         try:
             httpd.serve_forever()
