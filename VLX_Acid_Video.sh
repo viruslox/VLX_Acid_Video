@@ -1,13 +1,15 @@
 #!/bin/bash
 
 # Acid_video - Procedural Video Generator
-# Usage: ./generate.sh -t <type> -s <widthxheight> -f <fps> -d <duration> [-save]
+# Usage: ./generate.sh -t <type> -s <widthxheight> -f <fps> -d <duration> [-stream] [-save [filename]]
 
-OUTPUT="stream.webm"
+OUTPUT=""
 SAVE=false
+STREAM=false
+SAVE_NAME=""
 
 usage() {
-    echo "Usage: $0 -t [urandom|seq|fibonacci|fourier|fractal] -s [WxH] -f [1-60] -d [sec] [-save]"
+    echo "Usage: $0 -t [urandom|seq|fibonacci|fourier|fractal] -s [WxH] -f [1-60] -d [sec] [-stream] [-save [filename]]"
     exit 1
 }
 
@@ -18,7 +20,15 @@ while [[ "$#" -gt 0 ]]; do
         -s) SIZE="$2"; shift ;;
         -f) FPS="$2"; shift ;;
         -d) DUR="$2"; shift ;;
-        -save) SAVE=true ;;
+        -stream) STREAM=true ;;
+        -save)
+            SAVE=true
+            # Check if next argument exists and is not a flag
+            if [[ "$#" -gt 1 && "$2" != -* ]]; then
+                SAVE_NAME="$2"
+                shift
+            fi
+            ;;
         *) usage ;;
     esac
     shift
@@ -26,6 +36,8 @@ done
 
 # Validation logic
 if [[ -z "$TYPE" || -z "$SIZE" || -z "$FPS" || -z "$DUR" ]]; then usage; fi
+if [[ "$STREAM" == false && "$SAVE" == false ]]; then usage; fi
+
 if [[ ! "$SIZE" =~ ^[0-9]+x[0-9]+$ ]] || [ "$FPS" -lt 1 ] || [ "$FPS" -gt 60 ]; then
     echo "Error: Invalid dimensions or FPS out of range (1-60)."
     exit 1
@@ -34,7 +46,21 @@ fi
 W=$(echo $SIZE | cut -d'x' -f1)
 H=$(echo $SIZE | cut -d'x' -f2)
 
-# Generate HTML5 Interface
+# Determine Outputs
+if [ "$SAVE" = true ]; then
+    if [ -z "$SAVE_NAME" ]; then
+        SAVE_NAME="AcidVideo_${TYPE}_$(date +%Y-%m-%d_%H-%M-%S).webm"
+    fi
+fi
+
+if [ "$STREAM" = true ]; then
+    OUTPUT="stream.webm"
+else
+    OUTPUT="$SAVE_NAME"
+fi
+
+# Generate HTML5 Interface (Only if streaming)
+if [ "$STREAM" = true ]; then
 cat <<EOF > index.html
 <!DOCTYPE html>
 <html lang="en">
@@ -54,6 +80,7 @@ cat <<EOF > index.html
 </body>
 </html>
 EOF
+fi
 
 # Generator definitions
 case $TYPE in
@@ -81,4 +108,14 @@ esac
 echo "Executing $TYPE engine..."
 ffmpeg -y $INPUT -t "$DUR" -c:v libvpx -cpu-used 4 -deadline realtime -pix_fmt yuv420p "$OUTPUT"
 
-[[ "$SAVE" = false ]] && rm -f "$OUTPUT" && echo "Cleanup complete." || echo "Video saved to $OUTPUT"
+# Cleanup / Save logic
+if [ "$STREAM" = true ]; then
+    if [ "$SAVE" = true ]; then
+        cp "$OUTPUT" "$SAVE_NAME"
+        echo "Video saved to $SAVE_NAME"
+    fi
+    rm -f "$OUTPUT"
+    echo "Stream cleanup complete."
+elif [ "$SAVE" = true ]; then
+    echo "Video saved to $OUTPUT"
+fi
