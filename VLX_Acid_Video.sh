@@ -59,7 +59,7 @@ EOF
 case $TYPE in
     urandom)
         # Raw entropy stream
-        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=rgb24,noise=alls=100:allf=t+u"
+        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS,format=rgb24,noise=all_strength=100:allf=t+u"
         ;;
     fourier)
         # Tri-channel interference patterns
@@ -67,7 +67,7 @@ case $TYPE in
         ;;
     fibonacci)
         # Golden ratio spiral-based math
-        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS -vf \"geq=r='128+120*sin(sqrt(X*X+Y*Y)*1.618-T)':g='128+120*sin(X*1.618+T)':b='128+120*sin(Y*1.618+T)'\""
+        INPUT="-f lavfi -i nullsrc=s=$SIZE:r=$FPS -vf geq=r='128+120*sin(sqrt(X*X+Y*Y)*1.618-T)':g='128+120*sin(X*1.618+T)':b='128+120*sin(Y*1.618+T)'"
         ;;
     fractal)
         INPUT="-f lavfi -i mandelbrot=size=$SIZE:rate=$FPS"
